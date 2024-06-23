@@ -1,0 +1,572 @@
+import argparse
+import time
+import requests
+import json
+import unicodedata
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from wordcloud import WordCloud
+import pandas as pd
+
+mpl.rcParams['font.sans-serif'] = ['SimSun', 'DejaVu Sans', 'Arial Unicode MS']
+mpl.rcParams['axes.unicode_minus'] = False  # 解决保存图表时负号'-'显示为方块的问
+
+city_coordinates = {
+    "郑州市": (113.631419, 34.753439),
+    "中原区": (113.619476, 34.754451),
+    "二七区": (113.64641, 34.731045),
+    "管城回族区": (113.683525, 34.759674),
+    "金水区": (113.666448, 34.80607),
+    "上街区": (113.315497, 34.808819),
+    "惠济区": (113.623455, 34.87352),
+    "中牟县": (113.982485, 34.725011),
+    "巩义市": (113.028431, 34.754097),
+    "荥阳市": (113.389423, 34.793811),
+    "新密市": (113.397391, 34.545898),
+    "新郑市": (113.746434, 34.401766),
+    "登封市": (113.056423, 34.459697),
+    "开封市": (114.314593, 34.802886),
+    "龙亭区": (114.361413, 34.822036),
+    "顺河回族区": (114.361413, 34.822036),
+    "鼓楼区": (114.361413, 34.822036),
+    "禹王台区": (114.361413, 34.822036),
+    "金明区": (114.229635, 34.798756),
+    "祥符区": (114.452186, 34.726004),
+    "杞县": (114.789592, 34.554857),
+    "通许县": (114.473436, 34.486772),
+    "尉氏县": (114.199561, 34.417228),
+    "兰考县": (114.827461, 34.828493),
+    "洛阳市": (112.459421, 34.624263),
+    "老城区": (112.476504, 34.689601),
+    "西工区": (112.4344, 34.666768),
+    "瀍河回族区": (112.506604, 34.685462),
+    "涧西区": (112.402552, 34.663469),
+    "吉利区": (112.595478, 34.907013),
+    "洛龙区": (112.470469, 34.624705),
+    "孟津县": (112.451418, 34.831732),
+    "新安县": (112.14061, 34.734383),
+    "栾川县": (111.622427, 33.791822),
+    "嵩县": (112.092408, 34.140722),
+    "汝阳县": (112.479503, 34.159843),
+    "宜阳县": (112.179465, 34.541047),
+    "洛宁县": (111.659587, 34.394985),
+    "伊川县": (112.432407, 34.427646),
+    "偃师市": (112.796421, 34.733797),
+    "平顶山市": (113.199529, 33.772051),
+    "新华区": (113.30044, 33.743657),
+    "卫东区": (113.341611, 33.740376),
+    "石龙区": (112.905455, 33.904754),
+    "湛河区": (113.250515, 33.68579),
+    "宝丰县": (113.061447, 33.874746),
+    "叶县": (113.363582, 33.632492),
+    "鲁山县": (112.914434, 33.744879),
+    "郏县": (113.219606, 33.977486),
+    "舞钢市": (113.53141, 33.299431),
+    "汝州市": (112.85055, 34.172768),
+    "安阳市": (114.3995, 36.105941),
+    "文峰区": (114.363374, 36.096833),
+    "北关区": (114.362382, 36.113132),
+    "殷都区": (114.309598, 36.115758),
+    "龙安区": (114.307593, 36.082753),
+    "安阳县": (114.238382, 36.218907),
+    "汤阴县": (114.363409, 35.927644),
+    "滑县": (114.525553, 35.581045),
+    "内黄县": (114.907589, 35.97695),
+    "林州市": (113.82559, 36.088853),
+    "鹤壁市": (114.303594, 35.752357),
+    "鹤山区": (114.169555, 35.96028),
+    "山城区": (114.190621, 35.90337),
+    "淇滨区": (114.305591, 35.746953),
+    "浚县": (114.557608, 35.681917),
+    "淇县": (114.21549, 35.627277),
+    "新乡市": (113.9336, 35.30964),
+    "红旗区": (113.881416, 35.310136),
+    "卫滨区": (113.872439, 35.308459),
+    "凤泉区": (113.912459, 35.375665),
+    "牧野区": (113.915513, 35.321023),
+    "新乡县": (113.811594, 35.196564),
+    "获嘉县": (113.663417, 35.265809),
+    "原阳县": (113.946624, 35.071164),
+    "延津县": (114.211512, 35.147807),
+    "封丘县": (114.425606, 35.046858),
+    "长垣县": (114.67561, 35.207198),
+    "卫辉市": (114.071601, 35.404069),
+    "辉县市": (113.811573, 35.467958),
+    "焦作市": (113.248548, 35.220963),
+    "解放区": (113.237572, 35.24631),
+    "中站区": (113.189448, 35.242617),
+    "马村区": (113.328544, 35.261894),
+    "山阳区": (113.260484, 35.220272),
+    "修武县": (113.454582, 35.229323),
+    "博爱县": (113.070478, 35.177308),
+    "武陟县": (113.408396, 35.105838),
+    "温县": (113.086569, 34.946135),
+    "沁阳市": (112.957517, 35.093786),
+    "孟州市": (112.797395, 34.913598),
+    "濮阳市": (115.035597, 35.767593),
+    "华龙区": (115.080413, 35.783633),
+    "清丰县": (115.110472, 35.891308),
+    "南乐县": (115.211386, 36.076031),
+    "范县": (115.510586, 35.857655),
+    "台前县": (115.878568, 35.975013),
+    "濮阳县": (115.035584, 35.717889),
+    "许昌市": (113.858476, 34.041432),
+    "魏都区": (113.829596, 34.030861),
+    "许昌县": (113.829615, 34.129967),
+    "鄢陵县": (114.18562, 34.107963),
+    "襄城县": (113.513431, 33.856968),
+    "禹州市": (113.495505, 34.146082),
+    "长葛市": (113.774421, 34.223016),
+    "漯河市": (114.023421, 33.587711),
+    "源汇区": (113.990414, 33.578423),
+    "郾城区": (114.013394, 33.593416),
+    "召陵区": (114.100467, 33.592468),
+    "舞阳县": (113.61549, 33.443578),
+    "临颍县": (113.937578, 33.832692),
+    "三门峡市": (111.206533, 34.778327),
+    "湖滨区": (111.195574, 34.775997),
+    "陕州区": (111.109451, 34.726915),
+    "渑池县": (111.768542, 34.773197),
+    "卢氏县": (111.054564, 34.059925),
+    "义马市": (111.880515, 34.753028),
+    "灵宝市": (110.900408, 34.523143),
+    "南阳市": (112.534501, 32.996562),
+    "宛城区": (112.546454, 33.00987),
+    "卧龙区": (112.541462, 32.992484),
+    "南召县": (112.435425, 33.496186),
+    "方城县": (113.018503, 33.260539),
+    "西峡县": (111.480398, 33.313316),
+    "镇平县": (112.241544, 33.039719),
+    "内乡县": (111.855425, 33.051203),
+    "淅川县": (111.497432, 33.144185),
+    "社旗县": (112.954493, 33.062237),
+    "唐河县": (112.813424, 32.687721),
+    "新野县": (112.36655, 32.526632),
+    "桐柏县": (113.434473, 32.385131),
+    "邓州市": (112.09342, 32.693917),
+    "商丘市": (115.662449, 34.420202),
+    "梁园区": (115.620602, 34.449471),
+    "睢阳区": (115.659476, 34.394152),
+    "民权县": (115.154576, 34.652479),
+    "睢县": (115.078411, 34.451617),
+    "宁陵县": (115.320418, 34.466634),
+    "柘城县": (115.312435, 34.09736),
+    "虞城县": (115.834473, 34.405332),
+    "夏邑县": (116.137512, 34.243523),
+    "永城市": (116.455566, 33.934801),
+    "信阳市": (114.097483, 32.153015),
+    "浉河区": (114.065581, 32.122554),
+    "平桥区": (114.132407, 32.107325),
+    "罗山县": (114.51953, 32.20915),
+    "光山县": (114.925533, 32.015907),
+    "新县": (114.885525, 31.649738),
+    "商城县": (115.413513, 31.804345),
+    "固始县": (115.660488, 32.174174),
+    "潢川县": (115.058471, 32.137531),
+    "淮滨县": (115.426439, 32.47947),
+    "息县": (114.747453, 32.348956),
+    "周口市": (114.703483, 33.631829),
+    "川汇区": (114.657602, 33.652997),
+    "扶沟县": (114.40151, 34.065906),
+    "西华县": (114.535597, 33.773215),
+    "商水县": (114.618416, 33.548877),
+    "沈丘县": (115.105455, 33.415691),
+    "郸城县": (115.183478, 33.650828),
+    "淮阳县": (114.892586, 33.737347),
+    "太康县": (114.844384, 34.070038),
+    "鹿邑县": (115.490585, 33.867173),
+    "项城市": (114.881514, 33.473007),
+    "驻马店市": (114.028471, 33.017842),
+    "驿城区": (114.000387, 32.97952),
+    "西平县": (114.027474, 33.393861),
+    "上蔡县": (114.270487, 33.268511),
+    "平舆县": (114.625429, 32.967982),
+    "正阳县": (114.399497, 32.611641),
+    "确山县": (114.032495, 32.808176),
+    "泌阳县": (113.333558, 32.729731),
+    "汝南县": (114.369409, 33.013141),
+    "遂平县": (114.019441, 33.151971),
+    "新蔡县": (114.992469, 32.755269),
+    "济源市": (112.608581, 35.072907)
+}
+
+
+def get_realtimeweather(address):
+    latitude, longitude = address
+    url = f'https://api.caiyunapp.com/v2.6/test/{latitude},{longitude}/realtime'
+    req = requests.get(url)
+    return req.text
+
+
+def get_day3weather(address):
+    latitude, longitude = address
+    url = f'https://api.caiyunapp.com/v2.6/test/{latitude},{longitude}/daily?dailysteps=3'
+    req = requests.get(url)
+    return req.text
+
+
+def get_daykqweather(address):
+    current_timestamp = int(time.time())
+    latitude, longitude = address
+    url = f'https://api.caiyunapp.com/v2.6/test/{latitude},{longitude}/hourly?hourlysteps=24&begin={current_timestamp}'
+    req = requests.get(url)
+    return req.text
+
+
+def get_geocode(city):
+    normalized_city = unicodedata.normalize('NFKD', city).lower()
+    for key in city_coordinates:
+        normalized_key = unicodedata.normalize('NFKD', key).lower()
+        if normalized_key == normalized_city:
+            return city_coordinates[key]
+    return None
+
+
+def generate_wordcloud(weather_data):
+    # 检查字体路径是否存在
+    font_path = r'C:\Windows\Fonts\FZSTK.TTF'
+    try:
+        # 生成词云
+        wordcloud = WordCloud(
+            width=800,
+            height=400,
+            background_color='white',
+            font_path=font_path,
+            colormap='tab10'
+        ).generate_from_frequencies(weather_data)
+    except Exception as e:
+        print(f"Error loading font: {e}. Falling back to default font.")
+        wordcloud = WordCloud(
+            width=800,
+            height=400,
+            background_color='white',
+            colormap='tab10'
+        ).generate_from_frequencies(weather_data)
+
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    plt.show()
+
+
+def get_weather_info(data):
+    parsed_data = json.loads(data)
+    realtime = parsed_data["result"]["realtime"]
+    weather_data = {
+        '环境舒适度: ' + realtime["life_index"]["comfort"]["desc"]: 90,
+        '实时温度: ' + str(realtime["temperature"]): 80,
+        '湿度: ' + str(realtime["humidity"]): 70,
+        '体感温度: ' + str(realtime["apparent_temperature"]): 60,
+        '风速: ' + str(realtime["wind"]["speed"]): 50,
+        '风向: ' + str(realtime["wind"]["direction"]): 40,
+        '空气质量: ' + realtime["air_quality"]["description"]["chn"]: 30,
+        '紫外线强度: ' + realtime["life_index"]["ultraviolet"]["desc"]: 20
+    }
+    return weather_data
+
+
+def get_daily_weather_info(data):
+    parsed_data = json.loads(data)
+    daily_info = parsed_data["result"]["daily"]
+    weather_data = []
+    length = len(daily_info["temperature"])
+    for i in range(length):
+        day_weather = {
+            '日期': daily_info["temperature"][i]["date"],
+            '最高温度': daily_info["temperature"][i]["max"],
+            '最低温度': daily_info["temperature"][i]["min"],
+            '平均温度': daily_info["temperature"][i]["avg"],
+            '降水概率': daily_info["precipitation"][i]["probability"],
+            '最高风速': daily_info["wind"][i]["max"]["speed"],
+            '最低风速': daily_info["wind"][i]["min"]["speed"],
+            '平均风速': daily_info["wind"][i]["avg"]["speed"],
+            '最高湿度': daily_info["humidity"][i]["max"],
+            '最低湿度': daily_info["humidity"][i]["min"],
+            '平均湿度': daily_info["humidity"][i]["avg"],
+            '空气质量指数': daily_info["air_quality"]["aqi"][i]["avg"]["chn"],
+            'PM2.5': daily_info["air_quality"]["pm25"][i]["avg"],
+            '紫外线强度': daily_info["life_index"]["ultraviolet"][i]["desc"],
+            '舒适度': daily_info["life_index"]["comfort"][i]["desc"],
+            '穿衣指数': daily_info["life_index"]["dressing"][i]["desc"],
+            '洗车指数': daily_info["life_index"]["carWashing"][i]["desc"],
+            '感冒风险': daily_info["life_index"]["coldRisk"][i]["desc"]
+        }
+        weather_data.append(day_weather)
+    return weather_data
+
+
+def generate_day3wordcloud(day_weather):
+    wordcloud_data = {
+        '最高温度: ' + str(day_weather['最高温度']): 90,
+        '最低温度: ' + str(day_weather['最低温度']): 80,
+        '平均温度: ' + str(day_weather['平均温度']): 70,
+        '降水概率: ' + str(day_weather['降水概率']) + '%': 60,
+        '最高风速: ' + str(day_weather['最高风速']) + ' km/h': 50,
+        '最低风速: ' + str(day_weather['最低风速']) + ' km/h': 50,
+        '平均风速: ' + str(day_weather['平均风速']) + ' km/h': 50,
+        '最高湿度: ' + str(day_weather['最高湿度'] * 100) + '%': 40,
+        '最低湿度: ' + str(day_weather['最低湿度'] * 100) + '%': 40,
+        '平均湿度: ' + str(day_weather['平均湿度'] * 100) + '%': 40,
+        '空气质量指数: ' + str(day_weather['空气质量指数']): 30,
+        'PM2.5: ' + str(day_weather['PM2.5']): 20,
+        '紫外线强度: ' + day_weather['紫外线强度']: 10,
+        '舒适度: ' + day_weather['舒适度']: 10,
+        '穿衣指数: ' + day_weather['穿衣指数']: 10,
+        '洗车指数: ' + day_weather['洗车指数']: 10,
+        '感冒风险: ' + day_weather['感冒风险']: 10
+    }
+    wordcloud = WordCloud(
+        width=800,
+        height=400,
+        background_color='white',
+        font_path=r'C:\Windows\Fonts\FZSTK.TTF',  # 确保字体路径正确
+        colormap='tab10'
+    ).generate_from_frequencies(wordcloud_data)
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation='bilinear')
+    plt.axis('off')
+    plt.title(day_weather['日期'])
+    plt.show()
+
+
+def generate_line_chart(weather_data, metric, ylabel):
+    dates = [day['日期'] for day in weather_data]
+    date_labels = [date.split('T')[0] for date in dates]
+    values = [day[metric] for day in weather_data]
+    plt.figure(figsize=(10, 5))
+    plt.plot(date_labels, values, marker='o', linestyle='-', color='b')
+    plt.xlabel('日期')
+    plt.ylabel(ylabel)
+    plt.title(f'{ylabel} 变化趋势')
+    plt.grid(True)
+    plt.xticks(ticks=range(len(date_labels)), labels=date_labels, rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+
+def provide_travel_advice(weather_data):
+    advice = []
+    for day_weather in weather_data:
+        date = day_weather['日期']
+        desc = f"{date}: "
+        if day_weather['降水概率'] > 50:
+            desc += "有较高降水概率，建议携带雨具。"
+        else:
+            desc += "降水概率较低，可以放心出行。"
+        if day_weather['空气质量指数'] > 100:
+            desc += " 空气质量较差，建议减少户外活动。"
+        else:
+            desc += " 空气质量良好，适合户外活动。"
+        if '强' in day_weather['紫外线强度']:
+            desc += " 紫外线较强，出行时请注意防晒。"
+        advice.append(desc)
+    return advice
+
+
+def plot_weather_data(data):
+    if isinstance(data, str):
+        data = json.loads(data)
+    hourly_info = data["result"]["hourly"]
+    temperature = [item["value"] for item in hourly_info["temperature"]]
+    apparent_temperature = [item["value"] for item in hourly_info["apparent_temperature"]]
+    precipitation = [item["value"] for item in hourly_info["precipitation"]]
+    wind_speed = [item["speed"] for item in hourly_info["wind"]]
+    humidity = [item["value"] for item in hourly_info["humidity"]]
+    cloudrate = [item["value"] for item in hourly_info["cloudrate"]]
+    pressure = [item["value"] for item in hourly_info["pressure"]]
+    visibility = [item["value"] for item in hourly_info["visibility"]]
+    dswrf = [item["value"] for item in hourly_info["dswrf"]]
+    aqi = [item["value"]["chn"] for item in hourly_info["air_quality"]["aqi"]]
+    pm25 = [item["value"] for item in hourly_info["air_quality"]["pm25"]]
+    times = [item["datetime"][11:16] for item in hourly_info["temperature"]]
+
+    # 保证时间和数据一致性
+    if len(times) > 24:
+        times = times[:24]
+    if len(temperature) > 24:
+        temperature = temperature[:24]
+    if len(apparent_temperature) > 24:
+        apparent_temperature = apparent_temperature[:24]
+    if len(precipitation) > 24:
+        precipitation = precipitation[:24]
+    if len(wind_speed) > 24:
+        wind_speed = wind_speed[:24]
+    if len(humidity) > 24:
+        humidity = humidity[:24]
+    if len(cloudrate) > 24:
+        cloudrate = cloudrate[:24]
+    if len(pressure) > 24:
+        pressure = pressure[:24]
+    if len(visibility) > 24:
+        visibility = visibility[:24]
+    if len(dswrf) > 24:
+        dswrf = dswrf[:24]
+    if len(aqi) > 24:
+        aqi = aqi[:24]
+    if len(pm25) > 24:
+        pm25 = pm25[:24]
+
+    fig, axs = plt.subplots(6, 2, figsize=(15, 20))
+    fig.suptitle('24小时天气数据变化', fontsize=20)
+
+    axs[0, 0].plot(times, temperature, label='温度 (°C)')
+    axs[0, 0].set_title('温度')
+    axs[0, 0].set_ylabel('温度 (°C)')
+    axs[0, 0].legend(loc='upper right')
+
+    axs[0, 1].plot(times, apparent_temperature, label='体感温度 (°C)', color='orange')
+    axs[0, 1].set_title('体感温度')
+    axs[0, 1].set_ylabel('体感温度 (°C)')
+    axs[0, 1].legend(loc='upper right')
+
+    axs[1, 0].plot(times, precipitation, label='降水量 (mm)', color='blue')
+    axs[1, 0].set_title('降水量')
+    axs[1, 0].set_ylabel('降水量 (mm)')
+    axs[1, 0].legend(loc='upper right')
+
+    axs[1, 1].plot(times, wind_speed, label='风速 (km/h)', color='green')
+    axs[1, 1].set_title('风速')
+    axs[1, 1].set_ylabel('风速 (km/h)')
+    axs[1, 1].legend(loc='upper right')
+
+    axs[2, 0].plot(times, humidity, label='湿度 (%)', color='purple')
+    axs[2, 0].set_title('湿度')
+    axs[2, 0].set_ylabel('湿度 (%)')
+    axs[2, 0].legend(loc='upper right')
+
+    axs[2, 1].plot(times, cloudrate, label='云量 (%)', color='grey')
+    axs[2, 1].set_title('云量')
+    axs[2, 1].set_ylabel('云量 (%)')
+    axs[2, 1].legend(loc='upper right')
+
+    axs[3, 0].plot(times, pressure, label='气压 (Pa)', color='brown')
+    axs[3, 0].set_title('气压')
+    axs[3, 0].set_ylabel('气压 (Pa)')
+    axs[3, 0].legend(loc='upper right')
+
+    axs[3, 1].plot(times, visibility, label='可见度 (km)', color='cyan')
+    axs[3, 1].set_title('可见度')
+    axs[3, 1].set_ylabel('可见度 (km)')
+    axs[3, 1].legend(loc='upper right')
+
+    axs[4, 0].plot(times, dswrf, label='下行短波辐射 (W/m²)', color='magenta')
+    axs[4, 0].set_title('下行短波辐射')
+    axs[4, 0].set_ylabel('下行短波辐射 (W/m²)')
+    axs[4, 0].legend(loc='upper right')
+
+    axs[4, 1].plot(times, aqi, label='空气质量 (AQI)', color='darkred')
+    axs[4, 1].set_title('空气质量 (AQI)')
+    axs[4, 1].set_ylabel('空气质量 (AQI)')
+    axs[4, 1].legend(loc='upper right')
+
+    axs[5, 0].plot(times, pm25, label='PM2.5 (µg/m³)', color='darkblue')
+    axs[5, 0].set_title('PM2.5')
+    axs[5, 0].set_ylabel('PM2.5 (µg/m³)')
+    axs[5, 0].legend(loc='upper right')
+
+    axs[5, 1].axis('off')
+
+    for ax in axs.flat:
+        ax.set_xlabel('时间')
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
+
+
+def export_to_excel(data, filename):
+    """
+    将数据导出到 Excel 文件。
+
+    参数:
+    data (list[dict] 或 dict): 需要导出的数据。可以是字典列表或单个字典。
+    filename (str): 导出的 Excel 文件名。
+    """
+    # 确保文件名包含 .xlsx 扩展名
+    if not filename.lower().endswith('.xlsx'):
+        filename += '.xlsx'
+
+    # 如果数据是 JSON 字符串，先解析它
+    if isinstance(data, str):
+        data = json.loads(data)
+
+    # 如果数据是单个字典，转换为包含该字典的列表
+    if isinstance(data, dict):
+        data = [data]
+
+    # 创建 DataFrame 并导出到 Excel 文件
+    df = pd.DataFrame(data)
+    df.to_excel(filename, index=False)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Weather Data Processing')
+    parser.add_argument('--city', type=str, required=True, help='请输入城市名')
+    parser.add_argument('--task', type=str, required=True,
+                        choices=['realtime', '3days', '24hours'],
+                        help='选择要执行的任务: realtime, 3days, 24hours')
+    parser.add_argument('--export', type=str, help='导出数据到 Excel 文件 (示例: output.xlsx)')
+    args = parser.parse_args()
+
+    city = args.city
+    address = get_geocode(city)
+
+    if args.task == 'realtime':
+        data = get_realtimeweather(address)
+        weather_data = get_weather_info(data)
+        generate_wordcloud(weather_data)
+        if args.export:
+            export_to_excel(weather_data, args.export)
+    elif args.task == '3days':
+        data1 = get_day3weather(address)
+        daily_weather_info = get_daily_weather_info(data1)
+
+        for day_weather in daily_weather_info:
+            generate_day3wordcloud(day_weather)
+
+        metrics = ['最高温度', '最低温度', '平均温度', '降水概率', '最高风速', '最低风速', '平均风速', '最高湿度',
+                   '最低湿度',
+                   '平均湿度', '空气质量指数', 'PM2.5']
+        metric_labels = ['最高温度 (°C)', '最低温度 (°C)', '平均温度 (°C)', '降水概率 (%)', '最高风速 (km/h)',
+                         '最低风速 (km/h)', '平均风速 (km/h)', '最高湿度 (%)', '最低湿度 (%)', '平均湿度 (%)',
+                         '空气质量指数', 'PM2.5 (µg/m³)']
+
+        for metric, label in zip(metrics, metric_labels):
+            generate_line_chart(daily_weather_info, metric, label)
+
+        travel_advice = provide_travel_advice(daily_weather_info)
+        for advice in travel_advice:
+            print(advice)
+
+        if args.export:
+            export_to_excel(daily_weather_info, args.export)
+    elif args.task == '24hours':
+        daydata = get_daykqweather(address)
+        plot_weather_data(daydata)
+        if args.export:
+            hourly_info = json.loads(daydata)["result"]["hourly"]
+            weather_data = {
+                '时间': [item["datetime"] for item in hourly_info["temperature"]],
+                '温度 (°C)': [item["value"] for item in hourly_info["temperature"]],
+                '体感温度 (°C)': [item["value"] for item in hourly_info["apparent_temperature"]],
+                '降水量 (mm)': [item["value"] for item in hourly_info["precipitation"]],
+                '风速 (km/h)': [item["speed"] for item in hourly_info["wind"]],
+                '湿度 (%)': [item["value"] for item in hourly_info["humidity"]],
+                '云量 (%)': [item["value"] for item in hourly_info["cloudrate"]],
+                '气压 (Pa)': [item["value"] for item in hourly_info["pressure"]],
+                '能见度 (km)': [item["value"] for item in hourly_info["visibility"]],
+                '下行短波辐射 (W/m²)': [item["value"] for item in hourly_info["dswrf"]],
+                '空气质量 (AQI)': [item["value"]["chn"] for item in hourly_info["air_quality"]["aqi"]],
+                'PM2.5 (µg/m³)': [item["value"] for item in hourly_info["air_quality"]["pm25"]]
+            }
+            # 重组数据，使其格式正确
+            reformatted_data = []
+            for i in range(len(weather_data['时间'])):
+                row = {key: value[i] for key, value in weather_data.items()}
+                reformatted_data.append(row)
+            export_to_excel(reformatted_data, args.export)
+
+
+if __name__ == "__main__":
+    main()
+
