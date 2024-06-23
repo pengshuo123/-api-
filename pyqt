@@ -194,14 +194,14 @@ city_coordinates = {
 
 def get_realtimeweather(address):
     latitude, longitude = address
-    url = f'https://api.caiyunapp.com/v2.6/8C8wipxaOsFZ3l8X/{latitude},{longitude}/realtime'
+    url = f'https://api.caiyunapp.com/v2.6/test/{latitude},{longitude}/realtime'
     req = requests.get(url)
     return req.text
 
 
 def get_day3weather(address):
     latitude, longitude = address
-    url = f'https://api.caiyunapp.com/v2.6/8C8wipxaOsFZ3l8X/{latitude},{longitude}/daily?dailysteps=3'
+    url = f'https://api.caiyunapp.com/v2.6/test/{latitude},{longitude}/daily?dailysteps=3'
     req = requests.get(url)
     return req.text
 
@@ -209,7 +209,7 @@ def get_day3weather(address):
 def get_daykqweather(address):
     current_timestamp = int(time.time())
     latitude, longitude = address
-    url = f'https://api.caiyunapp.com/v2.6/8C8wipxaOsFZ3l8X/{latitude},{longitude}/hourly?hourlysteps=24&begin={current_timestamp}'
+    url = f'https://api.caiyunapp.com/v2.6/test/{latitude},{longitude}/hourly?hourlysteps=24&begin={current_timestamp}'
     req = requests.get(url)
     return req.text
 
